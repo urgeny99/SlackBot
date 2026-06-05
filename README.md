@@ -15,7 +15,7 @@ A Slack bot that lives in your channels and talks back with attitude.
 
 ## Try it out
 
-Add Marcellus to any channel with `/invite @Marcellus` and @ mention it with a message to get a response.
+Add Marcellus to any channel with `/invite @Marcellus` and @mention it with a message to get a response OR open a DM with it and chat without having to @mention it.
 
 ## Built with
 
