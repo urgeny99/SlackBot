@@ -11,7 +11,7 @@ A Slack bot that lives in your channels and talks back with attitude.
 - `/marc-help` — show all commands
 - `/marc-clear` — Clears bot history
 - `/marc-clear-dm` — Clears your DM with bot
-- `/marc-weather` 
+- `/marc-weather <city>` — Gives weather data for this city
 
 ## Try it out
 
