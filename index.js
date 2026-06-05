@@ -40,7 +40,8 @@ app.command("/marc-help", async ({ ack, respond }) => {
 /marc-catfact - Get a cat fact
 /marc-joke - Get a random joke
 /marc-clear - Clear your conversation history
-/marc-weather <city> - Get weather information`
+/marc-weather <city> - Get weather information for a city
+/marc-clear-dm - Clear bot messages in this DM`
   });
 });
 
