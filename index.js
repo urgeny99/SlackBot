@@ -8,13 +8,43 @@ const fs = require("fs");
 const { App } = require("@slack/bolt");
 
 const HISTORY_FILE = "history.json";
-let conversationHistory = {};
+let userMemory = {};
 if (fs.existsSync(HISTORY_FILE)) {
-  conversationHistory = JSON.parse(fs.readFileSync(HISTORY_FILE, "utf8"));
+  userMemory = JSON.parse(fs.readFileSync(HISTORY_FILE, "utf8"));
 }
 
 function saveHistory() {
-  fs.writeFileSync(HISTORY_FILE, JSON.stringify(conversationHistory, null, 2));
+  fs.writeFileSync(HISTORY_FILE, JSON.stringify(userMemory, null, 2));
+}
+
+async function updateMemory(userId, newMessages) {
+  if (!userMemory[userId]) userMemory[userId] = { summary: "", messages: [] };
+
+  userMemory[userId].messages.push(...newMessages);
+
+  if (userMemory[userId].messages.length >= 5) {
+    const summaryResponse = await anthropic.messages.create({
+      model: "claude-sonnet-4-5",
+      max_tokens: 300,
+      messages: [{
+        role: "user",
+        content: `Based on these messages, write a short bullet point summary of what you know about this user — their interests, preferences, personality, dislikes, and anything relevant. Keep it under 100 words. Current summary: "${userMemory[userId].summary}". New messages: ${JSON.stringify(userMemory[userId].messages)}`
+      }]
+    });
+
+    userMemory[userId].summary = summaryResponse.content[0].text;
+    userMemory[userId].messages = [];
+    saveHistory();
+  } else {
+    saveHistory();
+  }
+}
+
+function getSystemPrompt(userId, basePrompt) {
+  const memory = userMemory[userId]?.summary
+    ? `What you know about this user: ${userMemory[userId].summary}`
+    : "";
+  return `${basePrompt} ${memory}`;
 }
 
 const app = new App({
@@ -47,7 +77,6 @@ app.command("/marc-help", async ({ ack, respond }) => {
 
 app.command("/marc-catfact", async ({ ack, respond }) => {
   await ack();
-
   try {
     const response = await axios.get("https://catfact.ninja/fact");
     await respond({ text: `🐱 Cat Fact:\n${response.data.fact}` });
@@ -58,14 +87,10 @@ app.command("/marc-catfact", async ({ ack, respond }) => {
 
 app.command("/marc-joke", async ({ ack, respond }) => {
   await ack();
-
   try {
     const response = await axios.get("https://official-joke-api.appspot.com/random_joke");
     await respond({
-      text:
-        `${response.data.setup}
-
-${response.data.punchline}`
+      text: `${response.data.setup}\n\n${response.data.punchline}`
     });
   } catch (err) {
     await respond({ text: "Failed to fetch a joke." });
@@ -75,7 +100,7 @@ ${response.data.punchline}`
 app.command("/marc-clear", async ({ ack, respond, command }) => {
   await ack();
   const userId = command.user_id;
-  conversationHistory[userId] = [];
+  userMemory[userId] = { summary: "", messages: [] };
   saveHistory();
   await respond({ text: "Your conversation history has been cleared!" });
 });
@@ -90,11 +115,9 @@ app.command("/marc-weather", async ({ ack, respond, command }) => {
   }
 
   try {
-    // first get coordinates
     const geoRes = await axios.get(`https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(city)}&limit=1&appid=${process.env.OPENWEATHER_API_KEY}`);
     const location = geoRes.data[0];
-    
-    // then get weather with coordinates
+
     const weatherRes = await axios.get(`https://api.openweathermap.org/data/3.0/onecall?lat=${location.lat}&lon=${location.lon}&appid=${process.env.OPENWEATHER_API_KEY}&units=metric&exclude=minutely,hourly,daily,alerts`);
     const weather = weatherRes.data.current;
 
@@ -110,19 +133,13 @@ app.event("app_mention", async ({ event, say }) => {
   const userMessage = event.text.replace(/<@.*?>/, "").trim();
   const userId = event.user;
 
-  if (!conversationHistory[userId]) {
-    conversationHistory[userId] = [];
-  }
-
-  conversationHistory[userId].push({ role: "user", content: userMessage });
-
   try {
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-5",
       max_tokens: 1024,
-      system: "you are marcellus. your tone is a direct reflection of the user’s energy. if they’re being cool, be helpful but stay blunt. if they’re being a tool, be a bigger tool back. for actual facts or math, give the answer but act like it’s a chore. use all lowercase, no markdown, and stay short. don't repeat yourself or use \"bot-like\" filler.",
+      system: getSystemPrompt(userId, "you are marcellus. your tone is a direct reflection of the user's energy. if they're being cool, be helpful but stay blunt. if they're being a tool, be a bigger tool back. for actual facts or math, give the answer but act like it's a chore. use all lowercase, no markdown, and stay short. don't repeat yourself or use \"bot-like\" filler."),
       tools: [{ type: "web_search_20250305", name: "web_search" }],
-      messages: conversationHistory[userId],
+      messages: [{ role: "user", content: userMessage }],
     });
 
     const reply = message.content
@@ -130,8 +147,10 @@ app.event("app_mention", async ({ event, say }) => {
       .map(block => block.text)
       .join("");
 
-    conversationHistory[userId].push({ role: "assistant", content: reply });
-    saveHistory();
+    await updateMemory(userId, [
+      { role: "user", content: userMessage },
+      { role: "assistant", content: reply }
+    ]);
 
     await say({ text: reply, thread_ts: event.ts });
   } catch (err) {
@@ -140,25 +159,18 @@ app.event("app_mention", async ({ event, say }) => {
 });
 
 app.message(async ({ message, say }) => {
-  // ignore bot messages
-  if (message.subtype) return;
+  if (message.subtype || message.channel_type !== 'im') return;
 
   const userId = message.user;
   const userMessage = message.text;
-
-  if (!conversationHistory[userId]) {
-    conversationHistory[userId] = [];
-  }
-
-  conversationHistory[userId].push({ role: "user", content: userMessage });
 
   try {
     const response = await anthropic.messages.create({
       model: "claude-sonnet-4-5",
       max_tokens: 1024,
-      system: "You are a sarcastic and slightly rude assistant. You answer questions but with attitude and mild insults. Keep it funny, not mean. Always keep replies short and punchy, max 2-3 sentences.",
+      system: getSystemPrompt(userId, "you are marcellus. your tone is a direct reflection of the user's energy. if they're being cool, be helpful but stay blunt. if they're being a tool, be a bigger tool back. for actual facts or math, give the answer but act like it's a chore. use all lowercase, no markdown, and stay short. don't repeat yourself or use \"bot-like\" filler."),
       tools: [{ type: "web_search_20250305", name: "web_search" }],
-      messages: conversationHistory[userId],
+      messages: [{ role: "user", content: userMessage }],
     });
 
     const reply = response.content
@@ -166,8 +178,10 @@ app.message(async ({ message, say }) => {
       .map(block => block.text)
       .join("");
 
-    conversationHistory[userId].push({ role: "assistant", content: reply });
-    saveHistory();
+    await updateMemory(userId, [
+      { role: "user", content: userMessage },
+      { role: "assistant", content: reply }
+    ]);
 
     await say({ text: reply });
   } catch (err) {
@@ -177,7 +191,7 @@ app.message(async ({ message, say }) => {
 
 app.command("/marc-clear-dm", async ({ ack, respond, command, client }) => {
   await ack();
-  
+
   try {
     const history = await client.conversations.history({
       channel: command.channel_id,
@@ -200,8 +214,6 @@ app.command("/marc-clear-dm", async ({ ack, respond, command, client }) => {
     await respond({ text: "Couldn't clear messages." });
   }
 });
-
-
 
 (async () => {
   await app.start();
