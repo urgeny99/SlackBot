@@ -38,7 +38,8 @@ app.command("/marc-help", async ({ ack, respond }) => {
 /marc-help - Show this help message
 /marc-ping - Check bot latency
 /marc-catfact - Get a cat fact
-/marc-joke - Get a random joke`
+/marc-joke - Get a random joke
+/marc-clear - Clear your conversation history`
   });
 });
 
