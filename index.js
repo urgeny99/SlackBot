@@ -69,6 +69,14 @@ ${response.data.punchline}`
   }
 });
 
+app.command("/marc-clear", async ({ ack, respond, command }) => {
+  await ack();
+  const userId = command.user_id;
+  conversationHistory[userId] = [];
+  saveHistory();
+  await respond({ text: "Your conversation history has been cleared!" });
+});
+
 app.event("app_mention", async ({ event, say }) => {
   const userMessage = event.text.replace(/<@.*?>/, "").trim();
   const userId = event.user;
