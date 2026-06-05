@@ -174,6 +174,34 @@ app.message(async ({ message, say }) => {
   }
 });
 
+app.command("/marc-clear-dm", async ({ ack, respond, command, client }) => {
+  await ack();
+  
+  try {
+    const history = await client.conversations.history({
+      channel: command.channel_id,
+      limit: 100
+    });
+
+    const botMessages = history.messages.filter(m => m.bot_id);
+
+    for (const msg of botMessages) {
+      try {
+        await client.chat.delete({
+          channel: command.channel_id,
+          ts: msg.ts
+        });
+      } catch (e) {}
+    }
+
+    await respond({ text: "Cleared!" });
+  } catch (err) {
+    await respond({ text: "Couldn't clear messages." });
+  }
+});
+
+
+
 (async () => {
   await app.start();
   console.log("bot is running!");
