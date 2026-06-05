@@ -9,6 +9,9 @@ A Slack bot that lives in your channels and talks back with attitude.
 - `/marc-catfact` — get a random cat fact
 - `/marc-joke` — get a random joke
 - `/marc-help` — show all commands
+- `/marc-clear` — Clears bot history
+- `/marc-clear-dm` — Clears your DM with bot
+- `/marc-weather` 
 
 ## Try it out
 
