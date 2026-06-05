@@ -89,11 +89,16 @@ app.command("/marc-weather", async ({ ack, respond, command }) => {
   }
 
   try {
-    const res = await axios.get(`https://api.openweathermap.org/data/3.0/onecall?q=${encodeURIComponent(city)}&appid=${process.env.OPENWEATHER_API_KEY}&units=metric`);
-    const weather = res.data.current;
+    // first get coordinates
+    const geoRes = await axios.get(`https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(city)}&limit=1&appid=${process.env.OPENWEATHER_API_KEY}`);
+    const location = geoRes.data[0];
+    
+    // then get weather with coordinates
+    const weatherRes = await axios.get(`https://api.openweathermap.org/data/3.0/onecall?lat=${location.lat}&lon=${location.lon}&appid=${process.env.OPENWEATHER_API_KEY}&units=metric&exclude=minutely,hourly,daily,alerts`);
+    const weather = weatherRes.data.current;
 
     await respond({
-      text: `Weather in ${city}:\n🌡️ Temperature: ${weather.temp}°C\n🌤️ ${weather.weather[0].description}\n💨 Wind: ${weather.wind_speed} km/h`
+      text: `Weather in ${location.name}, ${location.country}:\n🌡️ Temperature: ${weather.temp}°C\n🌤️ ${weather.weather[0].description}\n💨 Wind: ${weather.wind_speed} km/h`
     });
   } catch (err) {
     await respond({ text: "Couldn't find weather for that city." });
