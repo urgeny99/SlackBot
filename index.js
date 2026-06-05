@@ -34,7 +34,7 @@ app.command("/marc-help", async ({ ack, respond }) => {
   await ack();
   await respond({
     text:
-`Available Commands:
+      `Available Commands:
 /marc-help - Show this help message
 /marc-ping - Check bot latency
 /marc-catfact - Get a cat fact
@@ -60,7 +60,7 @@ app.command("/marc-joke", async ({ ack, respond }) => {
     const response = await axios.get("https://official-joke-api.appspot.com/random_joke");
     await respond({
       text:
-`${response.data.setup}
+        `${response.data.setup}
 
 ${response.data.punchline}`
     });
@@ -83,11 +83,16 @@ app.event("app_mention", async ({ event, say }) => {
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-5",
       max_tokens: 1024,
-      system: "You are a rude and sarcastic assistant with zero patience. You answer questions but constantly insult the user, mock their intelligence, and complain about having to help them. Keep it funny and over the top, not genuinely mean. Max 1-2 sentences.",
+      system: "you are marcellus. your tone is a direct reflection of the user’s energy. if they’re being cool, be helpful but stay blunt. if they’re being a tool, be a bigger tool back. for actual facts or math, give the answer but act like it’s a chore. use all lowercase, no markdown, and stay short. don't repeat yourself or use \"bot-like\" filler.",
+      tools: [{ type: "web_search_20250305", name: "web_search" }],
       messages: conversationHistory[userId],
     });
 
-    const reply = message.content[0].text;
+    const reply = message.content
+      .filter(block => block.type === "text")
+      .map(block => block.text)
+      .join("");
+
     conversationHistory[userId].push({ role: "assistant", content: reply });
     saveHistory();
 
