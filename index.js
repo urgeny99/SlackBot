@@ -39,7 +39,8 @@ app.command("/marc-help", async ({ ack, respond }) => {
 /marc-ping - Check bot latency
 /marc-catfact - Get a cat fact
 /marc-joke - Get a random joke
-/marc-clear - Clear your conversation history`
+/marc-clear - Clear your conversation history
+/marc-weather <city> - Get weather information`
   });
 });
 
@@ -76,6 +77,27 @@ app.command("/marc-clear", async ({ ack, respond, command }) => {
   conversationHistory[userId] = [];
   saveHistory();
   await respond({ text: "Your conversation history has been cleared!" });
+});
+
+app.command("/marc-weather", async ({ ack, respond, command }) => {
+  await ack();
+  const city = command.text.trim();
+
+  if (!city) {
+    await respond({ text: "Usage: /marc-weather <city>" });
+    return;
+  }
+
+  try {
+    const res = await axios.get(`https://api.openweathermap.org/data/3.0/onecall?q=${encodeURIComponent(city)}&appid=${process.env.OPENWEATHER_API_KEY}&units=metric`);
+    const weather = res.data.current;
+
+    await respond({
+      text: `Weather in ${city}:\n🌡️ Temperature: ${weather.temp}°C\n🌤️ ${weather.weather[0].description}\n💨 Wind: ${weather.wind_speed} km/h`
+    });
+  } catch (err) {
+    await respond({ text: "Couldn't find weather for that city." });
+  }
 });
 
 app.event("app_mention", async ({ event, say }) => {
