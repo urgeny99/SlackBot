@@ -158,11 +158,44 @@ app.event("app_mention", async ({ event, say }) => {
   }
 });
 
-app.message(async ({ message, say }) => {
+app.message(async ({ message, say, client }) => {
   if (message.subtype || message.channel_type !== 'im') return;
 
   const userId = message.user;
-  const userMessage = message.text;
+  let userMessage = message.text || "";
+  let messageContent = [];
+
+  // check if there's an image attached
+  if (message.files && message.files.length > 0) {
+    for (const file of message.files) {
+      if (file.mimetype.startsWith('image/')) {
+        // download the image using the bot token
+        const imageRes = await axios.get(file.url_private, {
+          responseType: 'arraybuffer',
+          headers: { Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}` }
+        });
+
+        const base64 = Buffer.from(imageRes.data).toString('base64');
+        
+        messageContent.push({
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: file.mimetype,
+            data: base64
+          }
+        });
+      }
+    }
+  }
+
+  // add text if there is any
+  if (userMessage) {
+    messageContent.push({ type: "text", text: userMessage });
+  }
+
+  // fallback if no text and no image
+  if (messageContent.length === 0) return;
 
   try {
     const response = await anthropic.messages.create({
@@ -170,7 +203,7 @@ app.message(async ({ message, say }) => {
       max_tokens: 1024,
       system: getSystemPrompt(userId, "you are marcellus. your tone is a direct reflection of the user's energy. if they're being cool, be helpful but stay blunt. if they're being a tool, be a bigger tool back. for actual facts or math, give the answer but act like it's a chore. use all lowercase, no markdown, and stay short like under 1-2 sentences unless it is really necessary. don't repeat yourself or use \"bot-like\" filler."),
       tools: [{ type: "web_search_20250305", name: "web_search" }],
-      messages: [{ role: "user", content: userMessage }],
+      messages: [{ role: "user", content: messageContent }],
     });
 
     const reply = response.content
@@ -179,16 +212,16 @@ app.message(async ({ message, say }) => {
       .join("");
 
     await updateMemory(userId, [
-      { role: "user", content: userMessage },
+      { role: "user", content: userMessage || "[sent an image]" },
       { role: "assistant", content: reply }
     ]);
 
     await say({ text: reply });
   } catch (err) {
+    console.error(err);
     await say({ text: "Failed to get a response." });
   }
 });
-
 app.command("/marc-clear-dm", async ({ ack, respond, command, client }) => {
   await ack();
 
