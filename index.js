@@ -138,6 +138,42 @@ app.event("app_mention", async ({ event, say }) => {
   }
 });
 
+app.message(async ({ message, say }) => {
+  // ignore bot messages
+  if (message.subtype) return;
+
+  const userId = message.user;
+  const userMessage = message.text;
+
+  if (!conversationHistory[userId]) {
+    conversationHistory[userId] = [];
+  }
+
+  conversationHistory[userId].push({ role: "user", content: userMessage });
+
+  try {
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-5",
+      max_tokens: 1024,
+      system: "You are a sarcastic and slightly rude assistant. You answer questions but with attitude and mild insults. Keep it funny, not mean. Always keep replies short and punchy, max 2-3 sentences.",
+      tools: [{ type: "web_search_20250305", name: "web_search" }],
+      messages: conversationHistory[userId],
+    });
+
+    const reply = response.content
+      .filter(block => block.type === "text")
+      .map(block => block.text)
+      .join("");
+
+    conversationHistory[userId].push({ role: "assistant", content: reply });
+    saveHistory();
+
+    await say({ text: reply });
+  } catch (err) {
+    await say({ text: "Failed to get a response." });
+  }
+});
+
 (async () => {
   await app.start();
   console.log("bot is running!");
