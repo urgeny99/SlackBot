@@ -14,13 +14,28 @@ const fs = require("fs");
 const { App } = require("@slack/bolt");
 
 const HISTORY_FILE = "history.json";
+const BOT_FACTS_FILE = "botfacts.json";
+
 let userMemory = {};
 if (fs.existsSync(HISTORY_FILE)) {
   userMemory = JSON.parse(fs.readFileSync(HISTORY_FILE, "utf8"));
 }
 
+let botFacts = [];
+if (fs.existsSync(BOT_FACTS_FILE)) {
+  botFacts = JSON.parse(fs.readFileSync(BOT_FACTS_FILE, "utf8"));
+}
+
 function saveHistory() {
   fs.writeFileSync(HISTORY_FILE, JSON.stringify(userMemory, null, 2));
+}
+
+function saveBotFacts() {
+  fs.writeFileSync(BOT_FACTS_FILE, JSON.stringify(botFacts, null, 2));
+}
+
+function getBotFacts() {
+  return botFacts.length > 0 ? `\nThings you know as facts: ${botFacts.join(". ")}` : "";
 }
 
 async function updateMemory(userId, newMessages) {
@@ -50,7 +65,7 @@ function getSystemPrompt(userId, basePrompt) {
   const memory = userMemory[userId]?.summary
     ? `What you know about this user: ${userMemory[userId].summary}`
     : "";
-  return `${basePrompt} ${memory}`;
+  return `${basePrompt}${getBotFacts()} ${memory}`;
 }
 
 const app = new App({
@@ -77,7 +92,9 @@ app.command("/marc-help", async ({ ack, respond }) => {
 /marc-joke - Get a random joke
 /marc-clear - Clear your conversation history
 /marc-weather <city> - Get weather information for a city
-/marc-clear-dm - Clear bot messages in this DM`
+/marc-clear-dm - Clear bot messages in this DM
+/marc-teach <fact> - Teach the bot a new fact
+/marc-forget - Show or remove taught facts`
   });
 });
 
@@ -133,6 +150,49 @@ app.command("/marc-weather", async ({ ack, respond, command }) => {
   } catch (err) {
     await respond({ text: "Couldn't find weather for that city." });
   }
+});
+
+app.command("/marc-teach", async ({ ack, respond, command }) => {
+  await ack();
+  const fact = command.text.trim();
+
+  if (!fact) {
+    await respond({ text: "Usage: /marc-teach <fact>" });
+    return;
+  }
+
+  if (botFacts.length >= 20) {
+    await respond({ text: "I'm full! Use /marc-forget to remove some facts first." });
+    return;
+  }
+
+  botFacts.push(fact);
+  saveBotFacts();
+  await respond({ text: `Got it! I'll remember: "${fact}"` });
+});
+
+app.command("/marc-forget", async ({ ack, respond, command }) => {
+  await ack();
+  const input = command.text.trim();
+
+  if (!input) {
+    if (botFacts.length === 0) {
+      await respond({ text: "No facts stored yet!" });
+      return;
+    }
+    await respond({ text: `Current facts:\n${botFacts.map((f, i) => `${i + 1}. ${f}`).join("\n")}` });
+    return;
+  }
+
+  const index = parseInt(input) - 1;
+  if (isNaN(index) || index < 0 || index >= botFacts.length) {
+    await respond({ text: "Invalid number. Use /marc-forget to see the list." });
+    return;
+  }
+
+  const removed = botFacts.splice(index, 1);
+  saveBotFacts();
+  await respond({ text: `Forgot: "${removed[0]}"` });
 });
 
 app.event("app_mention", async ({ event, say }) => {
