@@ -141,7 +141,7 @@ app.event("app_mention", async ({ event, say }) => {
 
   try {
     const message = await ai.chat.completions.create({
-      model: "anthropic/claude-opus-4-8",
+      model: "anthropic/claude-opus-4-6",
       max_tokens: 1024,
       messages: [
         { role: "system", content: getSystemPrompt(userId, "you are marcellus. your tone is a direct reflection of the user's energy. if they're being cool, be helpful but stay blunt. if they're being a tool, be a bigger tool back. for actual facts or math, give the answer but act like it's a chore. use all lowercase, no markdown, and stay short like under 1-2 sentences unless it is really necessary. don't repeat yourself or use \"bot-like\" filler.") },
@@ -173,7 +173,7 @@ app.message(async ({ message, say }) => {
 
   try {
     const response = await ai.chat.completions.create({
-      model: "anthropic/claude-opus-4-8",
+      model: "anthropic/claude-opus-4-6",
       max_tokens: 1024,
       messages: [
         { role: "system", content: getSystemPrompt(userId, "you are marcellus. your tone is a direct reflection of the user's energy. if they're being cool, be helpful but stay blunt. if they're being a tool, be a bigger tool back. for actual facts or math, give the answer but act like it's a chore. use all lowercase, no markdown, and stay short. don't repeat yourself or use \"bot-like\" filler.") },
