@@ -15,6 +15,7 @@ const { App } = require("@slack/bolt");
 
 const HISTORY_FILE = "history.json";
 const BOT_FACTS_FILE = "botfacts.json";
+const ADMIN_USER_ID = "U0A173QKK9R";
 
 let userMemory = {};
 if (fs.existsSync(HISTORY_FILE)) {
@@ -154,6 +155,12 @@ app.command("/marc-weather", async ({ ack, respond, command }) => {
 
 app.command("/marc-teach", async ({ ack, respond, command }) => {
   await ack();
+
+  if (command.user_id !== ADMIN_USER_ID) {
+    await respond({ text: "nah you're not allowed to do that." });
+    return;
+  }
+
   const fact = command.text.trim();
 
   if (!fact) {
@@ -173,6 +180,12 @@ app.command("/marc-teach", async ({ ack, respond, command }) => {
 
 app.command("/marc-forget", async ({ ack, respond, command }) => {
   await ack();
+
+  if (command.user_id !== ADMIN_USER_ID) {
+    await respond({ text: "nah you're not allowed to do that." });
+    return;
+  }
+
   const input = command.text.trim();
 
   if (!input) {
