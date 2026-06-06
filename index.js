@@ -3,6 +3,12 @@ require("dotenv").config();
 const Anthropic = require("@anthropic-ai/sdk");
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+const OpenAI = require("openai");
+const ai = new OpenAI({
+  apiKey: process.env.HACKCLUB_API_KEY,
+  baseURL: "https://ai.hackclub.com/proxy/v1",
+});
+
 const axios = require("axios");
 const fs = require("fs");
 const { App } = require("@slack/bolt");
@@ -134,18 +140,16 @@ app.event("app_mention", async ({ event, say }) => {
   const userId = event.user;
 
   try {
-    const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-5",
+    const message = await ai.chat.completions.create({
+      model: "anthropic/claude-opus-4-8",
       max_tokens: 1024,
-      system: getSystemPrompt(userId, "you are marcellus. your tone is a direct reflection of the user's energy. if they're being cool, be helpful but stay blunt. if they're being a tool, be a bigger tool back. for actual facts or math, give the answer but act like it's a chore. use all lowercase, no markdown, and stay short like under 1-2 sentences unless it is really necessary. don't repeat yourself or use \"bot-like\" filler."),
-      tools: [{ type: "web_search_20250305", name: "web_search" }],
-      messages: [{ role: "user", content: userMessage }],
+      messages: [
+        { role: "system", content: getSystemPrompt(userId, "you are marcellus. your tone is a direct reflection of the user's energy. if they're being cool, be helpful but stay blunt. if they're being a tool, be a bigger tool back. for actual facts or math, give the answer but act like it's a chore. use all lowercase, no markdown, and stay short like under 1-2 sentences unless it is really necessary. don't repeat yourself or use \"bot-like\" filler.") },
+        { role: "user", content: userMessage }
+      ],
     });
 
-    const reply = message.content
-      .filter(block => block.type === "text")
-      .map(block => block.text)
-      .join("");
+    const reply = message.choices[0].message.content;
 
     await updateMemory(userId, [
       { role: "user", content: userMessage },
@@ -154,65 +158,33 @@ app.event("app_mention", async ({ event, say }) => {
 
     await say({ text: reply, thread_ts: event.ts });
   } catch (err) {
+    console.error(err);
     await say({ text: "Failed to get a response.", thread_ts: event.ts });
   }
 });
 
-app.message(async ({ message, say, client }) => {
+app.message(async ({ message, say }) => {
   if (message.subtype || message.channel_type !== 'im') return;
 
   const userId = message.user;
-  let userMessage = message.text || "";
-  let messageContent = [];
+  const userMessage = message.text;
 
-  // check if there's an image attached
-  if (message.files && message.files.length > 0) {
-    for (const file of message.files) {
-      if (file.mimetype.startsWith('image/')) {
-        // download the image using the bot token
-        const imageRes = await axios.get(file.url_private, {
-          responseType: 'arraybuffer',
-          headers: { Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}` }
-        });
-
-        const base64 = Buffer.from(imageRes.data).toString('base64');
-        
-        messageContent.push({
-          type: "image",
-          source: {
-            type: "base64",
-            media_type: file.mimetype,
-            data: base64
-          }
-        });
-      }
-    }
-  }
-
-  // add text if there is any
-  if (userMessage) {
-    messageContent.push({ type: "text", text: userMessage });
-  }
-
-  // fallback if no text and no image
-  if (messageContent.length === 0) return;
+  if (!userMessage) return;
 
   try {
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-5",
+    const response = await ai.chat.completions.create({
+      model: "anthropic/claude-opus-4-8",
       max_tokens: 1024,
-      system: getSystemPrompt(userId, "you are marcellus. your tone is a direct reflection of the user's energy. if they're being cool, be helpful but stay blunt. if they're being a tool, be a bigger tool back. for actual facts or math, give the answer but act like it's a chore. use all lowercase, no markdown, and stay short like under 1-2 sentences unless it is really necessary. don't repeat yourself or use \"bot-like\" filler."),
-      tools: [{ type: "web_search_20250305", name: "web_search" }],
-      messages: [{ role: "user", content: messageContent }],
+      messages: [
+        { role: "system", content: getSystemPrompt(userId, "you are marcellus. your tone is a direct reflection of the user's energy. if they're being cool, be helpful but stay blunt. if they're being a tool, be a bigger tool back. for actual facts or math, give the answer but act like it's a chore. use all lowercase, no markdown, and stay short. don't repeat yourself or use \"bot-like\" filler.") },
+        { role: "user", content: userMessage }
+      ],
     });
 
-    const reply = response.content
-      .filter(block => block.type === "text")
-      .map(block => block.text)
-      .join("");
+    const reply = response.choices[0].message.content;
 
     await updateMemory(userId, [
-      { role: "user", content: userMessage || "[sent an image]" },
+      { role: "user", content: userMessage },
       { role: "assistant", content: reply }
     ]);
 
@@ -222,6 +194,7 @@ app.message(async ({ message, say, client }) => {
     await say({ text: "Failed to get a response." });
   }
 });
+
 app.command("/marc-clear-dm", async ({ ack, respond, command, client }) => {
   await ack();
 
@@ -239,7 +212,7 @@ app.command("/marc-clear-dm", async ({ ack, respond, command, client }) => {
           channel: command.channel_id,
           ts: msg.ts
         });
-      } catch (e) {}
+      } catch (e) { }
     }
 
     await respond({ text: "Cleared!" });
