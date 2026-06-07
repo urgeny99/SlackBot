@@ -26,5 +26,5 @@ Add Marcellus to any channel with `/invite @Marcellus` and @ mention it with a m
 ## Built with
 
 - [slack api](https://app.slack.com/app-settings)
-- [Hackclub AI API](ai.hackclub.com)
+- [Hackclub AI API](https://ai.hackclub.com)
 - Hosted on [Hack Club Nest](https://hackclub.com/nest)
