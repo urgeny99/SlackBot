@@ -15,7 +15,7 @@ A Slack bot that lives in your channels (or DMs) and talks back with attitude.
 
 ### (ONLY FOR ADMINS)
 - `/marc-teach` - Teach things not included in bots training data
-- `/marc-forget` - List and delete taugth facts stored in botfacts.json
+- `/marc-forget` - List and delete the taugth facts stored in botfacts.json
 
 
 
