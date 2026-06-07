@@ -13,6 +13,12 @@ A Slack bot that lives in your channels (or DMs) and talks back with attitude.
 - `/marc-clear-dm` — Clears your DM with bot
 - `/marc-weather <city>` — Gives weather data for this city
 
+### (ONLY FOR ADMINS)
+- `/marc-teach` - Teach things not included in bots training data
+- `/marc-forget` - List and delete taugth facts stored in botfacts.json
+
+
+
 ## Try it out
 
 Add Marcellus to any channel with `/invite @Marcellus` and @ mention it with a message to get a response OR open a DM with it and chat without having to @ mention it.
@@ -20,5 +26,5 @@ Add Marcellus to any channel with `/invite @Marcellus` and @ mention it with a m
 ## Built with
 
 - [slack api](https://app.slack.com/app-settings)
-- [Anthropic Claude API](https://anthropic.com)
+- [Hackclub AI API](ai.hackclub.com)
 - Hosted on [Hack Club Nest](https://hackclub.com/nest)
